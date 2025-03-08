@@ -14,8 +14,9 @@ img = np.array(bytearray(response.content), dtype=np.uint8)
 img = cv2.imdecode(img, cv2.IMREAD_COLOR)
 cv2.imwrite("image.jpg", img)
 
-model = YOLO("yolo11n.pt")
-results = model("image.jpg", save=True)
+model = YOLO("yolo11x.pt")
+# only bottle be outlined
+results = model("image.jpg", save=True, classes=[39])
 
 os.remove("image.jpg")
 
