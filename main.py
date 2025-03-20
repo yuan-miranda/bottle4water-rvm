@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 
 # change the url to the ip address of the esp32 camera
-url = "http://192.168.78.218/capture"
+url = "http://192.168.1.13/capture"
 response = requests.get(url)
 
 img = np.array(bytearray(response.content), dtype=np.uint8)

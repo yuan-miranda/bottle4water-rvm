@@ -5,8 +5,8 @@
 #define CAMERA_MODEL_AI_THINKER
 #include "camera_pins.h"
 
-const char* ssid = "ESP32-AP";
-const char* password = "12345678";
+const char* ssid = "PLDTHOMEFIBRFDza62.4g";
+const char* password = "PLDTWIFIPv54q";
 const char* serverAddress = "http://192.168.4.1";
 
 void startCameraServer();
@@ -90,7 +90,7 @@ void setup() {
         Serial.print(".");
     }
     Serial.println("\nWiFi connected");
-
+    delay(1000);
     startCameraServer();
     Serial.print("Camera Ready! Use 'http://");
     Serial.print(WiFi.localIP());
