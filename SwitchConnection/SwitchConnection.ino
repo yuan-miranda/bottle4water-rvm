@@ -94,121 +94,147 @@ void handleRoot() {
         <meta charset='UTF-8'>
         <meta name='viewport' content='width=device-width, initial-scale=1.0'>
         <title>ESP32</title>
+    </head>
+    <body>
+        <form id="connForm">
+            <label for="ssid">SSID:</label>
+            <input type="text" name="ssid" id="ssid" placeholder="Network name" required>
+            <input type="text" name="password" id="password" placeholder="Network password (if any)">
+            <button type="submit">Connect</button>
+        </form>
+        <p>Connection IP: <span id="connIP"></span></p>
+        <p>Connection Status: <span id="connStatus"></span></p>
+        <hr>
+        <p>ESP32-CAM Status: <span id="camStatus"></span></p>
+        <p>ESP32-CAM IP: <span id="camIp"></span></p>
+        <iframe id="camFeed" width="640" height="480" src=""></iframe>
+
         <script>
-            async function connect(event) {
-                event.preventDefault();
-                let ssid = document.querySelector("input[name='ssid']").value;
-                let password = document.querySelector("input[name='password']").value;
-                if (!ssid || !password) return alert('SSID and Password are required');
+            function formatLogMessage(level, processTime, message) {
+                const timestamp = new Date().toISOString();
+                return `${timestamp} ${level} ${processTime} - ${message}`;
+            }
 
-                let formData = new FormData(document.getElementById('networkForm'));
+            function formatProcessTime(startTime, endTime) {
+                const time = endTime - startTime;
+                const hours = Math.floor(time / 3600000)
+                const minutes = Math.floor((time % 3600000) / 60000);
+                const seconds = Math.floor((time % 60000) / 1000);
+                const milliseconds = Math.floor(time % 1000);
+                const processTime = `${hours ? hours + 'h ' : ''}${minutes ? minutes + 'm ' : ''}${seconds ? seconds + 's ' : ''}${milliseconds}ms`;
+                return processTime;
+            }
 
+            async function fetchGet(url) {
+                const startTime = performance.now();
+                let endTime;
                 try {
-                    const response = await fetch('/connect', {
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    endTime = performance.now();
+
+                    if (response.ok) return data;
+                    throw data;
+                } catch (error) {
+                    endTime = performance.now();
+
+                    if (error instanceof Error) console.error(`${formatLogMessage('ERROR', formatProcessTime(startTime, endTime), error.message)}`);
+                    else console.error(`${formatLogMessage(error.level, formatProcessTime(startTime, endTime), error.message)}`);
+                    throw error;
+                }
+            }
+
+            async function fetchPost(url, formData) {
+                const startTime = performance.now();
+                let endTime;
+                try {
+                    const response = await fetch(url, {
                         method: 'POST',
                         body: formData
                     });
+                    const data = await response.json();
+                    endTime = performance.now();
 
-                    if (response.ok) {
-                        const data = await response.text();
-
-                        if (data === 'Failed to connect to network') {
-                            document.getElementById('connIP').textContent = 'Connection IP: ';
-                            document.getElementById('connStatus').textContent = `Connection Status: ${data}`;
-                            alert(data);
-                            return;
-                        }
-
-                        document.getElementById('connIP').textContent = 'Connection IP: ' + data;
-                        document.getElementById('connStatus').textContent = 'Connection Status: Connected';
-                        alert(data);
-                    } else {
-                        alert(response.statusText);
-                    }
+                    if (response.ok) return data;
+                    throw data;
                 } catch (error) {
-                    console.error('Error connecting to network:', error);
-                    alert('Request failed');
+                    endTime = performance.now();
+
+                    if (error instanceof Error) console.error(`${formatLogMessage('ERROR', formatProcessTime(startTime, endTime), error.message)}`);
+                    else console.error(`${formatLogMessage(error.level, formatProcessTime(startTime, endTime), error.message)}`);
+                    throw error;
                 }
             }
 
-            async function checkStatus() {
+            async function connect(event) {
+                event.preventDefault();
+                const formData = new FormData(document.getElementById('connForm'));
+                const ssid = formData.get('ssid');
+                let password = formData.get('password');
+                if (!ssid) return alert('SSID is required');
+                if (!password) password = '';
+
                 try {
-                    const response = await fetch('/conn_status');
-                    if (response.ok) {
-                        const data = await response.text();
-                        document.getElementById('connStatus').textContent = 'Connection Status: ' + data;
-                        if (data === 'Not connected') document.getElementById('connIP').textContent = 'Connection IP: ';
-                    } else {
-                        document.getElementById('connStatus').textContent = 'Connection Status: Error';
-                    }
+                    const data = await fetchPost('/connect', formData);
+                    document.getElementById('connStatus').textContent = data.data.connStatus;
+                    document.getElementById('connIP').textContent = data.data.connIP;
+                    alert(data.message);
                 } catch (error) {
-                    console.error('Error fetching connection status:', error);
-                    document.getElementById('connStatus').textContent = 'Connection Status: Error';
-                    document.getElementById('connIP').textContent = 'Connection IP: ';
+                    alert(error.message);
                 }
             }
 
-            async function checkCamStatus() {
+            async function fetchConnStatus() {
                 try {
-                    const response = await fetch('/cam_status');
-                    if (response.ok) {
-                        const data = await response.text();
-                        document.getElementById('camStatus').textContent = 'ESP32-CAM Status: ' + data;
-                    } else {
-                        document.getElementById('camStatus').textContent = 'ESP32-CAM Status: Error';
-                    }
+                    const data = await fetchGet('/conn_status');
+                    document.getElementById('connStatus').textContent = data.data.connStatus;
+                    document.getElementById('connIP').textContent = data.data.connIP;
                 } catch (error) {
-                    console.error('Error fetching cam status:', error);
-                    document.getElementById('camStatus').textContent = 'ESP32-CAM Status: Error';
+                    document.getElementById('connStatus').textContent = 'Error';
+                    document.getElementById('connIP').textContent = '';
+                }
+            }
+
+            async function fetchCamStatus() {
+                try {
+                    const data = await fetchGet('/cam_status');
+                    document.getElementById('camStatus').textContent = data.data.camStatus;
+                } catch (error) {
+                    document.getElementById('camStatus').textContent = 'Error';
                 }
 
                 try {
-                    const response = await fetch('/cam_ip');
-                    if (response.ok) {
-                        const data = await response.text();
-                        const url = `http://${data}/`;
-                        const camFeedSrc = document.getElementById('camFeed').src;
-                        if (camFeedSrc !== url) {
-                            document.getElementById('camFeed').src = `http://${data}`;
-                            document.getElementById('camIp').textContent = 'ESP32-CAM IP: ' + data;
-                        }
-                    } else {
-                        document.getElementById('camIp').textContent = 'ESP32-CAM IP: Error';
-                        document.getElementById('camFeed').src = '';
+                    const data = await fetchGet('/cam_ip');
+                    const url = `http://${data.data.camIP}/`;
+                    const camFeedSrc = document.getElementById('camFeed').src;
+                    if (camFeedSrc !== url) {
+                        document.getElementById('camIp').textContent = data.data.camIP;
+                        document.getElementById('camFeed').src = url;
                     }
                 } catch (error) {
-                    console.error('Error fetching cam IP:', error);
-                    document.getElementById('camIp').textContent = 'ESP32-CAM IP: Error';
+                    document.getElementById('camIp').textContent = 'Error';
                     document.getElementById('camFeed').src = '';
                 }
             }
 
-            async function intervalCheck() {
+            async function updateStatus() {
                 try {
-                    await Promise.all([checkStatus(), checkCamStatus()]);
+                    await Promise.all([fetchConnStatus(), fetchCamStatus()]);
                 } catch (error) {
-                    console.error("Error checking status:", error);
+                    console.error('Error updating status:', error);
                 }
-                setTimeout(intervalCheck, 1000);
+                setTimeout(updateStatus, 1000);
+            }
+
+            function eventListeners() {
+                document.getElementById('connForm').addEventListener('submit', connect);
             }
 
             document.addEventListener('DOMContentLoaded', () => {
-                intervalCheck();
+                eventListeners();
+                updateStatus();
             });
         </script>
-    </head>
-    <body>
-        <form id='networkForm' onsubmit='connect(event)'>
-            SSID: <input type='text' name='ssid'><br>
-            Password: <input type='text' name='password'><br>
-            <input type='submit' value='Connect'>
-        </form>
-        <p id='connIP'>Connection IP: )rawliteral" + (localIP.toString() == "0.0.0.0" ? "" : localIP.toString()) + R"rawliteral(</p>
-        <p id='connStatus'>Connection Status: </p>
-        <hr>
-        <p id='camStatus'>ESP32-CAM Status: )rawliteral" + camStatus + R"rawliteral(</p>
-        <p id='camIp'>ESP32-CAM IP: )rawliteral" + camIp + R"rawliteral(</p>
-        <iframe id='camFeed' width='640' height='480' src='http://)rawliteral" + camIp + R"rawliteral('></iframe>
     </body>
     </html>
     )rawliteral";
@@ -216,44 +242,109 @@ void handleRoot() {
     server.send(200, "text/html", html);
 }
 
+String getStatus200(String message, String data) {
+    String response = R"rawliteral({
+        "status": 200,
+        "message": ")rawliteral" + message + R"rawliteral(",
+        "level": "INFO",
+        "data": {)rawliteral" + data + R"rawliteral(}
+    })rawliteral";
+    return response;
+}
+
+String getStatus400(String message) {
+    String response = R"rawliteral({
+        "status": 400,
+        "error": "Bad Request",
+        "message": ")rawliteral" + message + R"rawliteral(",
+        "level": "WARNING"
+    })rawliteral";
+    return response;
+}
+
+String getStatus500(String message) {
+    String response = R"rawliteral({
+        "status": 500,
+        "error": "Internal Server Error",
+        "message": ")rawliteral" + message + R"rawliteral(",
+        "level": "ERROR"
+    })rawliteral";
+    return response;
+}
+
 void handleConn() {
-    if (server.hasArg("ssid") && server.hasArg("password")) {
+    String response;
+    if (server.hasArg("ssid")) {
         String ssid = server.arg("ssid");
         String password = server.arg("password");
 
         Serial.printf("\nConnecting to %s with password %s\n", ssid.c_str(), password.c_str());
         
         if (connect(ssid.c_str(), password.c_str())) {
-            localIP = WiFi.localIP();
-            server.send(200, "text/plain", localIP.toString());
+            String ip = localIP.toString();
+            String data = R"rawliteral(
+                "connStatus": "Connected",
+                "connIP": ")rawliteral" + ip + R"rawliteral("
+            )rawliteral";
+            response = getStatus200("Connected to network", data);
+            server.send(200, "application/json", response);
         } else {
-            server.send(200, "text/plain", "Failed to connect to network");
+            response = getStatus500("Failed to connect to network");
+            server.send(500, "application/json", response);
         }
     } else {
-        server.send(400, "text/plain", "Missing SSID or password");
+        response = getStatus400("Missing SSID");
+        server.send(400, "application/json", response);
     }
 }
 
 void handleConnStatus() {
     if (WiFi.status() == WL_CONNECTED) {
-        server.send(200, "text/plain", "Connected");
+        String ip = localIP.toString();
+        String data = R"rawliteral(
+            "connStatus": "Connected",
+            "connIP": ")rawliteral" + ip + R"rawliteral("
+        )rawliteral";
+        String response = getStatus200("Connected to network", data);
+        server.send(200, "application/json", response);
     } else {
-        server.send(200, "text/plain", "Not connected");
+        String response = getStatus200("Not connected to network", "");
+        server.send(200, "application/json", response);
     }
 }
 
 void handleCamStatus() {
+    String response;
     if (server.hasArg("status")) {
         camStatus = server.arg("status");
-        server.send(200, "text/plain", "Camera status updated");
+        String data = R"rawliteral(
+            "camStatus": ")rawliteral" + camStatus + R"rawliteral("
+        )rawliteral";
+        response = getStatus200("Camera status updated", data);
+        server.send(200, "application/json", response);
     } else {
-        server.send(200, "text/plain", camStatus);
+        String data = R"rawliteral(
+            "camStatus": ")rawliteral" + camStatus + R"rawliteral("
+        )rawliteral";
+        response = getStatus200("Camera status", data);
+        server.send(200, "application/json", response);
     }
 }
 
 void handleCamIP() {
+    String response;
     if (server.hasArg("ip")) {
         camIp = server.arg("ip");
-        server.send(200, "text/plain", "Camera IP updated");
-    } else server.send(200, "text/plain", camIp);
+        String data = R"rawliteral(
+            "camIP": ")rawliteral" + camIp + R"rawliteral("
+        )rawliteral";
+        response = getStatus200("Camera IP updated", data);
+        server.send(200, "application/json", response);
+    } else {
+        String data = R"rawliteral(
+            "camIP": ")rawliteral" + camIp + R"rawliteral("
+        )rawliteral";
+        response = getStatus200("Camera IP", data);
+        server.send(200, "application/json", response);
+    }
 }
