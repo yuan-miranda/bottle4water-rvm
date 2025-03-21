@@ -92,6 +92,8 @@ void setup() {
 }
 
 void loop() {
+    if (staIP != IPAddress() && !pingSTA()) WiFi.disconnect(true);
+
     if (WiFi.status() != WL_CONNECTED) {
         Serial.printf("Disconnected from the network\n");
         staSSID = "";
@@ -105,6 +107,14 @@ void loop() {
 
     sendStatus();
     sendIp();
+}
+
+bool pingSTA() {
+    HTTPClient http;
+    http.begin("http://" + staIP.toString() + "/");
+    int httpCode = http.GET();
+    http.end();
+    return httpCode == 200;
 }
 
 bool connect(const char* ssid, const char* password) {
