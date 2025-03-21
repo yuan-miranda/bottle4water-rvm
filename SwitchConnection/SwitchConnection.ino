@@ -279,7 +279,7 @@ void handleRoot() {
             } catch (error) {
                 console.error('Error updating status:', error);
             }
-            setTimeout(updateStatus, 5000);
+            setTimeout(updateStatus, 2000);
         }
 
         function eventListeners() {
