@@ -10,7 +10,7 @@ const char* AP_PASSWORD = "12345678";
 const char* AP_LOCAL_IP = "http://192.168.4.1";
 
 String staSSID;
-String staPASSWORD;
+String staPassword;
 IPAddress staIP;
 
 void startCameraServer();
@@ -97,8 +97,6 @@ void setup() {
     }
 
     Serial.println("Connected to ESP32-AP");
-
-    connectSTA();
     
     startCameraServer();
     Serial.printf("AP_CameraWebServer started on http://%s\n", WiFi.localIP().toString().c_str());
@@ -108,7 +106,7 @@ void loop() {
     // reconnect to the AP if disconnected from the STA
     if (WiFi.status() != WL_CONNECTED) {
         staSSID = "";
-        staPASSWORD = "";
+        staPassword = "";
         staIP = IPAddress();
 
 
@@ -122,7 +120,7 @@ void loop() {
         }
     }
 
-    if (WiFi.status() == WL_CONNECTED) connectSTA();
+    // if (WiFi.status() == WL_CONNECTED) connectSTA();
 
     sendStatus();
     sendIp();
@@ -136,8 +134,9 @@ void connectSTA() {
     getSTAPassword();
 
     WiFi.disconnect();
-    Serial.printf("Connecting to %s with password %s\n", staSSID.c_str(), staPASSWORD.c_str());
-    WiFi.begin(staSSID.c_str(), staPASSWORD.c_str());
+    Serial.printf("Connecting to %s with password %s\n", staSSID.c_str(), staPassword.c_str());
+    WiFi.begin(staSSID.c_str(), staPassword.c_str());
+    WiFi.setSleep(false);
 
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 10) {
@@ -174,7 +173,7 @@ void getSTAPassword() {
     http.addHeader("Content-Type", "text/plain");
 
     int httpResponseCode = http.GET();
-    if (httpResponseCode == 200) staPASSWORD = http.getString();
+    if (httpResponseCode == 200) staPassword = http.getString();
     http.end();
 }
 

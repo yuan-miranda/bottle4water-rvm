@@ -6,6 +6,7 @@
     <title>ESP32</title>
 </head>
 <body>
+    <h2>ESP32</h2>
     <form id="connForm">
         <label for="ssid">SSID:</label>
         <input type="text" name="ssid" id="ssid" placeholder="Network name" required>
@@ -13,9 +14,12 @@
         <button type="submit">Connect</button>
         <button type="button" id="disconnect">Disconnect</button>
     </form>
+    <p>Connection SSID/Password: <span id="connSSID"></span> / <span id="connPassword"></span></p>
     <p>Connection IP: <span id="connIP"></span></p>
     <p>Connection Status: <span id="connStatus"></span></p>
     <hr>
+    <h2>ESP32-CAM</h2>
+    <p>ESP32-CAM SSID/Password: <span id="camSSID"></span> / <span id="camPassword"></span></p>
     <p>ESP32-CAM Status: <span id="camStatus"></span></p>
     <p>ESP32-CAM IP: <span id="camIp"></span></p>
     <iframe id="camFeed" width="640" height="480" src=""></iframe>
@@ -41,7 +45,12 @@
             let endTime;
             try {
                 const response = await fetch(url);
-                const data = await response.json();
+                let data;
+                try {
+                    data = await response.json();
+                } catch (error) {
+                    data = await response.text();
+                }
                 endTime = performance.now();
 
                 if (response.ok) return data;
@@ -87,6 +96,8 @@
 
             try {
                 const data = await fetchPost('/connect', formData);
+                document.getElementById('connSSID').textContent = data.data.connSSID;
+                document.getElementById('connPassword').textContent = data.data.connPassword;
                 document.getElementById('connStatus').textContent = data.data.connStatus;
                 document.getElementById('connIP').textContent = data.data.connIP;
                 alert(data.message);
@@ -98,6 +109,8 @@
         async function disconnect() {
             try {
                 const data = await fetchGet('/disconnect');
+                document.getElementById('connSSID').textContent = data.data.connSSID;
+                document.getElementById('connPassword').textContent = data.data.connPassword;
                 document.getElementById('connStatus').textContent = data.data.connStatus;
                 document.getElementById('connIP').textContent = data.data.connIP;
                 alert(data.message);
@@ -109,10 +122,14 @@
         async function fetchConnStatus() {
             try {
                 const data = await fetchGet('/conn_status');
+                document.getElementById('connSSID').textContent = data.data.connSSID;
+                document.getElementById('connPassword').textContent = data.data.connPassword;
                 document.getElementById('connStatus').textContent = data.data.connStatus;
                 document.getElementById('connIP').textContent = data.data.connIP;
             } catch (error) {
-                document.getElementById('connStatus').textContent = 'Error';
+                document.getElementById('connSSID').textContent = '';
+                document.getElementById('connPassword').textContent = '';
+                document.getElementById('connStatus').textContent = '';
                 document.getElementById('connIP').textContent = '';
             }
         }
@@ -122,7 +139,7 @@
                 const data = await fetchGet('/cam_status');
                 document.getElementById('camStatus').textContent = data.data.camStatus;
             } catch (error) {
-                document.getElementById('camStatus').textContent = 'Error';
+                document.getElementById('camStatus').textContent = '';
             }
 
             try {
@@ -139,9 +156,25 @@
             }
         }
 
+        async function fetchCamSSIDPassword() {
+            try {
+                const data = await fetchGet('/ssid');
+                document.getElementById('camSSID').textContent = data;
+            } catch (error) {
+                document.getElementById('camSSID').textContent = '';
+            }
+
+            try {
+                const data = await fetchGet('/password');
+                document.getElementById('camPassword').textContent = data;
+            } catch (error) {
+                document.getElementById('camPassword').textContent = '';
+            }
+        }
+
         async function updateStatus() {
             try {
-                await Promise.all([fetchConnStatus(), fetchCamStatus()]);
+                await Promise.all([fetchConnStatus(), fetchCamStatus(), fetchCamSSIDPassword()]);
             } catch (error) {
                 console.error('Error updating status:', error);
             }

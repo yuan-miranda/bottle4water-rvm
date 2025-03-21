@@ -37,9 +37,6 @@ void setup() {
     server.on("/cam_ip", HTTP_POST, handleCamIP);
     server.on("/cam_ip", HTTP_GET, handleCamIP);
 
-    // route that gets the connection to the network
-
-
     // pin route controls
     // server.on("");
 
@@ -81,7 +78,6 @@ bool connect(const char* ssid, const char* password) {
     unsigned long startTime = millis();
     while (millis() - startTime < 8000) {
         if (WiFi.status() == WL_CONNECTED) {
-            connIP = WiFi.localIP();
             return true;
         }
         delay(500);
@@ -101,6 +97,7 @@ void handleRoot() {
     <title>ESP32</title>
 </head>
 <body>
+    <h2>ESP32</h2>
     <form id="connForm">
         <label for="ssid">SSID:</label>
         <input type="text" name="ssid" id="ssid" placeholder="Network name" required>
@@ -108,9 +105,12 @@ void handleRoot() {
         <button type="submit">Connect</button>
         <button type="button" id="disconnect">Disconnect</button>
     </form>
+    <p>Connection SSID/Password: <span id="connSSID"></span> / <span id="connPassword"></span></p>
     <p>Connection IP: <span id="connIP"></span></p>
     <p>Connection Status: <span id="connStatus"></span></p>
     <hr>
+    <h2>ESP32-CAM</h2>
+    <p>ESP32-CAM SSID/Password: <span id="camSSID"></span> / <span id="camPassword"></span></p>
     <p>ESP32-CAM Status: <span id="camStatus"></span></p>
     <p>ESP32-CAM IP: <span id="camIp"></span></p>
     <iframe id="camFeed" width="640" height="480" src=""></iframe>
@@ -136,7 +136,12 @@ void handleRoot() {
             let endTime;
             try {
                 const response = await fetch(url);
-                const data = await response.json();
+                let data;
+                try {
+                    data = await response.json();
+                } catch (error) {
+                    data = await response.text();
+                }
                 endTime = performance.now();
 
                 if (response.ok) return data;
@@ -182,6 +187,8 @@ void handleRoot() {
 
             try {
                 const data = await fetchPost('/connect', formData);
+                document.getElementById('connSSID').textContent = data.data.connSSID;
+                document.getElementById('connPassword').textContent = data.data.connPassword;
                 document.getElementById('connStatus').textContent = data.data.connStatus;
                 document.getElementById('connIP').textContent = data.data.connIP;
                 alert(data.message);
@@ -193,6 +200,8 @@ void handleRoot() {
         async function disconnect() {
             try {
                 const data = await fetchGet('/disconnect');
+                document.getElementById('connSSID').textContent = data.data.connSSID;
+                document.getElementById('connPassword').textContent = data.data.connPassword;
                 document.getElementById('connStatus').textContent = data.data.connStatus;
                 document.getElementById('connIP').textContent = data.data.connIP;
                 alert(data.message);
@@ -204,10 +213,14 @@ void handleRoot() {
         async function fetchConnStatus() {
             try {
                 const data = await fetchGet('/conn_status');
+                document.getElementById('connSSID').textContent = data.data.connSSID;
+                document.getElementById('connPassword').textContent = data.data.connPassword;
                 document.getElementById('connStatus').textContent = data.data.connStatus;
                 document.getElementById('connIP').textContent = data.data.connIP;
             } catch (error) {
-                document.getElementById('connStatus').textContent = 'Error';
+                document.getElementById('connSSID').textContent = '';
+                document.getElementById('connPassword').textContent = '';
+                document.getElementById('connStatus').textContent = '';
                 document.getElementById('connIP').textContent = '';
             }
         }
@@ -217,7 +230,7 @@ void handleRoot() {
                 const data = await fetchGet('/cam_status');
                 document.getElementById('camStatus').textContent = data.data.camStatus;
             } catch (error) {
-                document.getElementById('camStatus').textContent = 'Error';
+                document.getElementById('camStatus').textContent = '';
             }
 
             try {
@@ -234,9 +247,25 @@ void handleRoot() {
             }
         }
 
+        async function fetchCamSSIDPassword() {
+            try {
+                const data = await fetchGet('/ssid');
+                document.getElementById('camSSID').textContent = data;
+            } catch (error) {
+                document.getElementById('camSSID').textContent = '';
+            }
+
+            try {
+                const data = await fetchGet('/password');
+                document.getElementById('camPassword').textContent = data;
+            } catch (error) {
+                document.getElementById('camPassword').textContent = '';
+            }
+        }
+
         async function updateStatus() {
             try {
-                await Promise.all([fetchConnStatus(), fetchCamStatus()]);
+                await Promise.all([fetchConnStatus(), fetchCamStatus(), fetchCamSSIDPassword()]);
             } catch (error) {
                 console.error('Error updating status:', error);
             }
@@ -299,11 +328,17 @@ void handleConn() {
         Serial.printf("\nConnecting to %s with password %s\n", staSSID.c_str(), staPASSWORD.c_str());
         
         if (connect(staSSID.c_str(), staPASSWORD.c_str())) {
+            Serial.printf("Connected to %s with IP %s\n", staSSID.c_str(), connIP.toString().c_str());
             connStatus = "Connected";
+            connIP = WiFi.localIP();
+
             String data = R"rawliteral(
                 "connStatus": ")rawliteral" + connStatus + R"rawliteral(",
-                "connIP": ")rawliteral" + connIP.toString() + R"rawliteral("
+                "connIP": ")rawliteral" + connIP.toString() + R"rawliteral(",
+                "connSSID": ")rawliteral" + WiFi.SSID() + R"rawliteral(",
+                "connPassword": ")rawliteral" + WiFi.psk() + R"rawliteral("
             )rawliteral";
+
             response = getStatus200("Connected to network", data);
             server.send(200, "application/json", response);
         } else {
@@ -319,12 +354,19 @@ void handleConn() {
 void handleDisconnect() {
     WiFi.disconnect(true);
     Serial.printf("\nDisconnected from %s\n", staSSID.c_str());
+
+    staSSID = WiFi.SSID();
+    staPASSWORD = WiFi.psk();
     connStatus = "Disconnected";
     connIP = IPAddress();
+
     String data = R"rawliteral(
         "connStatus": ")rawliteral" + connStatus + R"rawliteral(",
-        "connIP": ""
+        "connIP": "",
+        "connSSID": ")rawliteral" + staSSID + R"rawliteral(",
+        "connPassword": ")rawliteral" + staPASSWORD + R"rawliteral("
     )rawliteral";
+
     String response = getStatus200("Disconnected from network", data);
     server.send(200, "application/json", response);
 }
@@ -339,51 +381,46 @@ void handlePassword() {
 
 void handleConnStatus() {
     if (WiFi.status() == WL_CONNECTED) {
+        staSSID = WiFi.SSID();
+        staPASSWORD = WiFi.psk();
         connStatus = "Connected";
-        String data = R"rawliteral(
-            "connStatus": ")rawliteral" + connStatus + R"rawliteral(",
-            "connIP": ")rawliteral" + connIP.toString() + R"rawliteral("
-        )rawliteral";
-        String response = getStatus200("Connected to network", data);
-        server.send(200, "application/json", response);
+        connIP = WiFi.localIP();
     } else {
-        String response = getStatus200("Not connected to network", "");
-        server.send(200, "application/json", response);
+        staSSID = "";
+        staPASSWORD = "";
+        connStatus = "Not connected";
+        connIP = IPAddress();
     }
+
+    String data = R"rawliteral(
+        "connStatus": ")rawliteral" + connStatus + R"rawliteral(",
+        "connIP": ")rawliteral" + connIP.toString() + R"rawliteral(",
+        "connSSID": ")rawliteral" + staSSID + R"rawliteral(",
+        "connPassword": ")rawliteral" + staPASSWORD + R"rawliteral("
+    )rawliteral";
+
+    String response = getStatus200("Connection status", data);
+    server.send(200, "application/json", response);
 }
 
 void handleCamStatus() {
-    String response;
-    if (server.hasArg("status")) {
-        camStatus = server.arg("status");
-        String data = R"rawliteral(
-            "camStatus": ")rawliteral" + camStatus + R"rawliteral("
-        )rawliteral";
-        response = getStatus200("Camera status updated", data);
-        server.send(200, "application/json", response);
-    } else {
-        String data = R"rawliteral(
-            "camStatus": ")rawliteral" + camStatus + R"rawliteral("
-        )rawliteral";
-        response = getStatus200("Camera status", data);
-        server.send(200, "application/json", response);
-    }
+    if (server.hasArg("status")) camStatus = server.arg("status");
+
+    String data = R"rawliteral(
+        "camStatus": ")rawliteral" + camStatus + R"rawliteral("
+    )rawliteral";
+
+    String response = getStatus200("Camera status", data);
+    server.send(200, "application/json", response);
 }
 
 void handleCamIP() {
-    String response;
-    if (server.hasArg("ip")) {
-        camIp = server.arg("ip");
-        String data = R"rawliteral(
-            "camIP": ")rawliteral" + camIp + R"rawliteral("
-        )rawliteral";
-        response = getStatus200("Camera IP updated", data);
-        server.send(200, "application/json", response);
-    } else {
-        String data = R"rawliteral(
-            "camIP": ")rawliteral" + camIp + R"rawliteral("
-        )rawliteral";
-        response = getStatus200("Camera IP", data);
-        server.send(200, "application/json", response);
-    }
+    if (server.hasArg("ip")) camIp = server.arg("ip");
+
+    String data = R"rawliteral(
+        "camIP": ")rawliteral" + camIp + R"rawliteral("
+    )rawliteral";
+
+    String response = getStatus200("Camera IP", data);
+    server.send(200, "application/json", response);
 }
