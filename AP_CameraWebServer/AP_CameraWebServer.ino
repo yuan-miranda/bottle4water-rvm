@@ -81,44 +81,45 @@ void setup() {
     setupLedFlash(LED_GPIO_NUM);
 #endif
 
-    Serial.println("Connecting to ESP32-AP");
     WiFi.begin(AP_SSID, AP_PASSWORD);
     WiFi.setSleep(false);
 
     int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 10) {
+    while (WiFi.status() != WL_CONNECTED && attempts < 16) {
         delay(500);
         attempts++;
     }
 
     if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("Failed to connect to ESP32-AP");
+        Serial.printf("Failed to connect to %s\n", AP_SSID);
         return;
     }
 
-    Serial.println("Connected to ESP32-AP");
-    
     startCameraServer();
     Serial.printf("AP_CameraWebServer started on http://%s\n", WiFi.localIP().toString().c_str());
 }
 
 void loop() {
-    // reconnect to the AP if disconnected from the STA
     if (WiFi.status() != WL_CONNECTED) {
+        Serial.printf("Disconnected from the network\n");
         staSSID = "";
         staPassword = "";
         staIP = IPAddress();
 
         WiFi.disconnect();
+        delay(1000);
         WiFi.begin(AP_SSID, AP_PASSWORD);
 
         int attempts = 0;
-        while (WiFi.status() != WL_CONNECTED && attempts < 10) {
+        while (WiFi.status() != WL_CONNECTED && attempts < 16) {
             delay(500);
             attempts++;
         }
+
+        if (WiFi.status() == WL_CONNECTED) Serial.printf("Reconnected to %s with IP %s\n", AP_SSID, WiFi.localIP().toString().c_str());
+        else Serial.printf("Failed to reconnect to %s\n", AP_SSID);
     }
-    // if (WiFi.status() == WL_CONNECTED) connectSTA();
+    if (WiFi.status() == WL_CONNECTED) connectSTA();
 
     sendStatus();
     sendIp();
@@ -126,13 +127,17 @@ void loop() {
 }
 
 void connectSTA() {
+    getSTAIP();
     getSTASSID();
-    if (staSSID == WiFi.SSID()) return;
+    if (staSSID == "" || staSSID == WiFi.SSID()) {
+        Serial.printf("No STA SSID found\n");
+        return;
+    }
 
     getSTAPassword();
 
     WiFi.disconnect();
-    Serial.printf("Connecting to %s with password %s\n", staSSID.c_str(), staPassword.c_str());
+    delay(1000);
     WiFi.begin(staSSID.c_str(), staPassword.c_str());
     WiFi.setSleep(false);
 
@@ -142,10 +147,7 @@ void connectSTA() {
         attempts++;
     }
 
-    if (WiFi.status() == WL_CONNECTED) {
-        staIP = WiFi.localIP();
-        Serial.printf("Connected to %s with IP %s\n", staSSID.c_str(), staIP.toString().c_str());
-    }
+    if (WiFi.status() == WL_CONNECTED) Serial.printf("Connected to %s with IP %s\n", staSSID.c_str(), staIP.toString().c_str());
     else Serial.printf("Failed to connect to %s\n", staSSID.c_str());
 }
 
@@ -175,12 +177,27 @@ void getSTAPassword() {
     http.end();
 }
 
+void getSTAIP() {
+    HTTPClient http;
+    http.begin(String(AP_LOCAL_IP) + "/ip");
+    http.addHeader("Content-Type", "text/plain");
+
+    int httpResponseCode = http.GET();
+    if (httpResponseCode == 200) staIP.fromString(http.getString());
+    Serial.println(staIP.toString());
+    http.end();
+}
+
 void sendStatus() {
     if (WiFi.status() == WL_CONNECTED) {
         HTTPClient http;
 
-        if (WiFi.SSID() == AP_SSID) http.begin(String(AP_LOCAL_IP) + "/cam_status");
-        else http.begin("http://" + staIP.toString() + "/cam_status");
+        if (WiFi.SSID() == AP_SSID) {
+            http.begin(String(AP_LOCAL_IP) + "/cam_status");
+        }
+        else {
+            http.begin("http://" + staIP.toString() + "/cam_status");
+        }
 
         http.addHeader("Content-Type", "application/x-www-form-urlencoded");
         
@@ -193,8 +210,12 @@ void sendIp() {
     if (WiFi.status() == WL_CONNECTED) {
         HTTPClient http;
 
-        if (WiFi.SSID() == AP_SSID) http.begin(String(AP_LOCAL_IP) + "/cam_ip");
-        else http.begin("http://" + staIP.toString() + "/cam_ip");
+        if (WiFi.SSID() == AP_SSID) {
+            http.begin(String(AP_LOCAL_IP) + "/cam_ip");
+        }
+        else {
+            http.begin("http://" + staIP.toString() + "/cam_ip");
+        }
         
         http.addHeader("Content-Type", "application/x-www-form-urlencoded");
         

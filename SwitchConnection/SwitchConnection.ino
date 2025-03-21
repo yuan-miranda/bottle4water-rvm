@@ -31,6 +31,7 @@ void setup() {
     server.on("/disconnect", HTTP_GET, handleDisconnect);
     server.on("/ssid", HTTP_GET, handleSSID);
     server.on("/password", HTTP_GET, handlePassword);
+    server.on("/ip", HTTP_GET, handleIP);
     server.on("/conn_status", HTTP_GET, handleConnStatus);
     server.on("/cam_status", HTTP_POST, handleCamStatus);
     server.on("/cam_status", HTTP_GET, handleCamStatus);
@@ -84,6 +85,7 @@ bool connect(const char* ssid, const char* password) {
     }
 
     WiFi.disconnect(true);
+    delay(1000);
     return false;
 }
 
@@ -353,6 +355,7 @@ void handleConn() {
 
 void handleDisconnect() {
     WiFi.disconnect(true);
+    delay(1000);
     Serial.printf("\nDisconnected from %s\n", staSSID.c_str());
 
     staSSID = WiFi.SSID();
@@ -377,6 +380,10 @@ void handleSSID() {
 
 void handlePassword() {
     server.send(200, "text/plain", WiFi.psk());
+}
+
+void handleIP() {
+    server.send(200, "text/plain", WiFi.localIP().toString());
 }
 
 void handleConnStatus() {
