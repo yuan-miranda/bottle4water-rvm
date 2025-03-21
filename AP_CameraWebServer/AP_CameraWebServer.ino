@@ -11,7 +11,7 @@ const char* AP_LOCAL_IP = "http://192.168.4.1";
 
 String staSSID;
 String staPassword;
-IPAddress staIP;
+IPAddress staIP = IPAddress();
 
 void startCameraServer();
 void setupLedFlash(int pin);
@@ -109,7 +109,6 @@ void loop() {
         staPassword = "";
         staIP = IPAddress();
 
-
         WiFi.disconnect();
         WiFi.begin(AP_SSID, AP_PASSWORD);
 
@@ -119,7 +118,6 @@ void loop() {
             attempts++;
         }
     }
-
     // if (WiFi.status() == WL_CONNECTED) connectSTA();
 
     sendStatus();

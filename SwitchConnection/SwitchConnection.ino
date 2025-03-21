@@ -10,11 +10,11 @@ const char* AP_PASSWORD = "12345678";
 String staSSID;
 String staPASSWORD;
 
-String connStatus;
-IPAddress connIP;
+String connStatus = "Not connected";
+IPAddress connIP = IPAddress();
 
 String camStatus = "Offline";
-String camIp = "";
+IPAddress camIP = IPAddress();
 
 unsigned long lastHeartbeat = 0;
 int failedCamConnAttempts = 0;
@@ -58,7 +58,7 @@ void checkCamTimeout() {
         failedCamConnAttempts++;
         if (failedCamConnAttempts >= 3) {
             camStatus = "Offline";
-            camIp = "";
+            camIP = IPAddress();
             failedCamConnAttempts = 0;
         }
     } else failedCamConnAttempts = 0;
@@ -66,7 +66,7 @@ void checkCamTimeout() {
 
 bool pingCam() {
     HTTPClient http;
-    http.begin("http://" + camIp + "/");
+    http.begin("http://" + camIP.toString() + "/");
     int httpCode = http.GET();
     http.end();
     return httpCode == 200;
@@ -105,14 +105,14 @@ void handleRoot() {
         <button type="submit">Connect</button>
         <button type="button" id="disconnect">Disconnect</button>
     </form>
-    <p>Connection SSID/Password: <span id="connSSID"></span> / <span id="connPassword"></span></p>
-    <p>Connection IP: <span id="connIP"></span></p>
-    <p>Connection Status: <span id="connStatus"></span></p>
+    <p>Connection SSID/Password: <strong id="connSSID"></strong> / <strong id="connPassword"></strong></p>
+    <p>Connection Status: <strong id="connStatus"></strong></p>
+    <p>Connection IP: <strong id="connIP"></strong></p>
     <hr>
     <h2>ESP32-CAM</h2>
-    <p>ESP32-CAM SSID/Password: <span id="camSSID"></span> / <span id="camPassword"></span></p>
-    <p>ESP32-CAM Status: <span id="camStatus"></span></p>
-    <p>ESP32-CAM IP: <span id="camIp"></span></p>
+    <p>ESP32-CAM SSID/Password: <strong id="camSSID"></strong> / <strong id="camPassword"></strong></p>
+    <p>ESP32-CAM Status: <strong id="camStatus"></strong></p>
+    <p>ESP32-CAM IP: <strong id="camIP"></strong></p>
     <iframe id="camFeed" width="640" height="480" src=""></iframe>
 
     <script>
@@ -220,8 +220,8 @@ void handleRoot() {
             } catch (error) {
                 document.getElementById('connSSID').textContent = '';
                 document.getElementById('connPassword').textContent = '';
-                document.getElementById('connStatus').textContent = '';
-                document.getElementById('connIP').textContent = '';
+                document.getElementById('connStatus').textContent = 'Not connected';
+                document.getElementById('connIP').textContent = '0.0.0.0';
             }
         }
 
@@ -230,7 +230,7 @@ void handleRoot() {
                 const data = await fetchGet('/cam_status');
                 document.getElementById('camStatus').textContent = data.data.camStatus;
             } catch (error) {
-                document.getElementById('camStatus').textContent = '';
+                document.getElementById('camStatus').textContent = 'Offline';
             }
 
             try {
@@ -238,11 +238,11 @@ void handleRoot() {
                 const url = `http://${data.data.camIP}/`;
                 const camFeedSrc = document.getElementById('camFeed').src;
                 if (camFeedSrc !== url) {
-                    document.getElementById('camIp').textContent = data.data.camIP;
+                    document.getElementById('camIP').textContent = data.data.camIP;
                     document.getElementById('camFeed').src = url;
                 }
             } catch (error) {
-                document.getElementById('camIp').textContent = '';
+                document.getElementById('camIP').textContent = '0.0.0.0';
                 document.getElementById('camFeed').src = '';
             }
         }
@@ -328,9 +328,9 @@ void handleConn() {
         Serial.printf("\nConnecting to %s with password %s\n", staSSID.c_str(), staPASSWORD.c_str());
         
         if (connect(staSSID.c_str(), staPASSWORD.c_str())) {
-            Serial.printf("Connected to %s with IP %s\n", staSSID.c_str(), connIP.toString().c_str());
             connStatus = "Connected";
             connIP = WiFi.localIP();
+            Serial.printf("Connected to %s with IP %s\n", staSSID.c_str(), connIP.toString().c_str());
 
             String data = R"rawliteral(
                 "connStatus": ")rawliteral" + connStatus + R"rawliteral(",
@@ -357,7 +357,7 @@ void handleDisconnect() {
 
     staSSID = WiFi.SSID();
     staPASSWORD = WiFi.psk();
-    connStatus = "Disconnected";
+    connStatus = "Not connected";
     connIP = IPAddress();
 
     String data = R"rawliteral(
@@ -415,10 +415,10 @@ void handleCamStatus() {
 }
 
 void handleCamIP() {
-    if (server.hasArg("ip")) camIp = server.arg("ip");
+    if (server.hasArg("ip")) camIP.fromString(server.arg("ip"));
 
     String data = R"rawliteral(
-        "camIP": ")rawliteral" + camIp + R"rawliteral("
+        "camIP": ")rawliteral" + camIP.toString() + R"rawliteral("
     )rawliteral";
 
     String response = getStatus200("Camera IP", data);

@@ -14,14 +14,14 @@
         <button type="submit">Connect</button>
         <button type="button" id="disconnect">Disconnect</button>
     </form>
-    <p>Connection SSID/Password: <span id="connSSID"></span> / <span id="connPassword"></span></p>
-    <p>Connection IP: <span id="connIP"></span></p>
-    <p>Connection Status: <span id="connStatus"></span></p>
+    <p>Connection SSID/Password: <strong id="connSSID"></strong> / <strong id="connPassword"></strong></p>
+    <p>Connection Status: <strong id="connStatus"></strong></p>
+    <p>Connection IP: <strong id="connIP"></strong></p>
     <hr>
     <h2>ESP32-CAM</h2>
-    <p>ESP32-CAM SSID/Password: <span id="camSSID"></span> / <span id="camPassword"></span></p>
-    <p>ESP32-CAM Status: <span id="camStatus"></span></p>
-    <p>ESP32-CAM IP: <span id="camIp"></span></p>
+    <p>ESP32-CAM SSID/Password: <strong id="camSSID"></strong> / <strong id="camPassword"></strong></p>
+    <p>ESP32-CAM Status: <strong id="camStatus"></strong></p>
+    <p>ESP32-CAM IP: <strong id="camIP"></strong></p>
     <iframe id="camFeed" width="640" height="480" src=""></iframe>
 
     <script>
@@ -129,8 +129,8 @@
             } catch (error) {
                 document.getElementById('connSSID').textContent = '';
                 document.getElementById('connPassword').textContent = '';
-                document.getElementById('connStatus').textContent = '';
-                document.getElementById('connIP').textContent = '';
+                document.getElementById('connStatus').textContent = 'Not connected';
+                document.getElementById('connIP').textContent = '0.0.0.0';
             }
         }
 
@@ -139,7 +139,7 @@
                 const data = await fetchGet('/cam_status');
                 document.getElementById('camStatus').textContent = data.data.camStatus;
             } catch (error) {
-                document.getElementById('camStatus').textContent = '';
+                document.getElementById('camStatus').textContent = 'Offline';
             }
 
             try {
@@ -147,11 +147,11 @@
                 const url = `http://${data.data.camIP}/`;
                 const camFeedSrc = document.getElementById('camFeed').src;
                 if (camFeedSrc !== url) {
-                    document.getElementById('camIp').textContent = data.data.camIP;
+                    document.getElementById('camIP').textContent = data.data.camIP;
                     document.getElementById('camFeed').src = url;
                 }
             } catch (error) {
-                document.getElementById('camIp').textContent = '';
+                document.getElementById('camIP').textContent = '0.0.0.0';
                 document.getElementById('camFeed').src = '';
             }
         }
