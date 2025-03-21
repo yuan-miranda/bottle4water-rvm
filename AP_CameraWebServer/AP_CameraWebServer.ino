@@ -5,17 +5,19 @@
 #define CAMERA_MODEL_AI_THINKER
 #include "camera_pins.h"
 
-const char* ssid = "PLDTHOMEFIBRFDza62.4g";
-const char* password = "PLDTWIFIPv54q";
-const char* serverAddress = "http://192.168.4.1";
+const char* AP_SSID = "ESP32-AP";
+const char* AP_PASSWORD = "12345678";
+const char* AP_LOCAL_IP = "http://192.168.4.1";
+
+String staSSID;
+String staPASSWORD;
+IPAddress staIP;
 
 void startCameraServer();
 void setupLedFlash(int pin);
 
 void setup() {
     Serial.begin(115200);
-    Serial.setDebugOutput(true);
-    Serial.println();
 
     camera_config_t config;
     config.ledc_channel = LEDC_CHANNEL_0;
@@ -73,77 +75,133 @@ void setup() {
         s->set_saturation(s, -2);
     }
 
-    if (config.pixel_format == PIXFORMAT_JPEG) {
-        s->set_framesize(s, FRAMESIZE_QVGA);
-    }
+    if (config.pixel_format == PIXFORMAT_JPEG) s->set_framesize(s, FRAMESIZE_QVGA);
 
 #if defined(LED_GPIO_NUM)
     setupLedFlash(LED_GPIO_NUM);
 #endif
 
-    WiFi.begin(ssid, password);
+    Serial.println("Connecting to ESP32-AP");
+    WiFi.begin(AP_SSID, AP_PASSWORD);
     WiFi.setSleep(false);
 
-    Serial.print("WiFi connecting");
-    while (WiFi.status() != WL_CONNECTED) {
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 10) {
         delay(500);
-        Serial.print(".");
+        attempts++;
     }
-    Serial.println("\nWiFi connected");
-    delay(1000);
+
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("Failed to connect to ESP32-AP");
+        return;
+    }
+
+    Serial.println("Connected to ESP32-AP");
+
+    connectSTA();
+    
     startCameraServer();
-    Serial.print("Camera Ready! Use 'http://");
-    Serial.print(WiFi.localIP());
-    Serial.println("' to connect");
+    Serial.printf("AP_CameraWebServer started on http://%s\n", WiFi.localIP().toString().c_str());
 }
 
 void loop() {
+    // reconnect to the AP if disconnected from the STA
     if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("WiFi lost! Attempting reconnection...");
+        staSSID = "";
+        staPASSWORD = "";
+        staIP = IPAddress();
+
+
         WiFi.disconnect();
-        WiFi.begin(ssid, password);
-        
+        WiFi.begin(AP_SSID, AP_PASSWORD);
+
         int attempts = 0;
         while (WiFi.status() != WL_CONNECTED && attempts < 10) {
             delay(500);
-            Serial.print(".");
             attempts++;
         }
-
-        if (WiFi.status() == WL_CONNECTED) {
-            Serial.println("\nReconnected!");
-        } else {
-            Serial.println("\nFailed to reconnect. Retrying in next loop.");
-        }
     }
-    
+
+    if (WiFi.status() == WL_CONNECTED) connectSTA();
+
     sendStatus();
     sendIp();
     delay(1000);
 }
 
+void connectSTA() {
+    getSTASSID();
+    if (staSSID == WiFi.SSID()) return;
+
+    getSTAPassword();
+
+    WiFi.disconnect();
+    Serial.printf("Connecting to %s with password %s\n", staSSID.c_str(), staPASSWORD.c_str());
+    WiFi.begin(staSSID.c_str(), staPASSWORD.c_str());
+
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 10) {
+        delay(500);
+        attempts++;
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+        staIP = WiFi.localIP();
+        Serial.printf("Connected to %s with IP %s\n", staSSID.c_str(), staIP.toString().c_str());
+    }
+    else Serial.printf("Failed to connect to %s\n", staSSID.c_str());
+}
+
+void getSTASSID() {
+    HTTPClient http;
+
+    if (WiFi.SSID() == AP_SSID) http.begin(String(AP_LOCAL_IP) + "/ssid");
+    else http.begin("http://" + staIP.toString() + "/ssid");
+
+    http.addHeader("Content-Type", "text/plain");
+
+    int httpResponseCode = http.GET();
+    if (httpResponseCode == 200) staSSID = http.getString();
+    http.end();
+}
+
+void getSTAPassword() {
+    HTTPClient http;
+
+    if (WiFi.SSID() == AP_SSID) http.begin(String(AP_LOCAL_IP) + "/password");
+    else http.begin("http://" + staIP.toString() + "/password");
+
+    http.addHeader("Content-Type", "text/plain");
+
+    int httpResponseCode = http.GET();
+    if (httpResponseCode == 200) staPASSWORD = http.getString();
+    http.end();
+}
+
 void sendStatus() {
     if (WiFi.status() == WL_CONNECTED) {
         HTTPClient http;
-        http.begin(String(serverAddress) + "/cam_status");
+
+        if (WiFi.SSID() == AP_SSID) http.begin(String(AP_LOCAL_IP) + "/cam_status");
+        else http.begin("http://" + staIP.toString() + "/cam_status");
+
         http.addHeader("Content-Type", "application/x-www-form-urlencoded");
         
         int httpResponseCode = http.POST("status=Online");        
         http.end();
-    } else {
-        Serial.println("WiFi not connected!");
     }
 }
 
 void sendIp() {
     if (WiFi.status() == WL_CONNECTED) {
         HTTPClient http;
-        http.begin(String(serverAddress) + "/cam_ip");
+
+        if (WiFi.SSID() == AP_SSID) http.begin(String(AP_LOCAL_IP) + "/cam_ip");
+        else http.begin("http://" + staIP.toString() + "/cam_ip");
+        
         http.addHeader("Content-Type", "application/x-www-form-urlencoded");
         
         int httpResponseCode = http.POST("ip=" + WiFi.localIP().toString());        
         http.end();
-    } else {
-        Serial.println("WiFi not connected!");
     }
 }

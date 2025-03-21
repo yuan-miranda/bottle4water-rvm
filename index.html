@@ -11,6 +11,7 @@
         <input type="text" name="ssid" id="ssid" placeholder="Network name" required>
         <input type="text" name="password" id="password" placeholder="Network password (if any)">
         <button type="submit">Connect</button>
+        <button type="button" id="disconnect">Disconnect</button>
     </form>
     <p>Connection IP: <span id="connIP"></span></p>
     <p>Connection Status: <span id="connStatus"></span></p>
@@ -94,6 +95,17 @@
             }
         }
 
+        async function disconnect() {
+            try {
+                const data = await fetchGet('/disconnect');
+                document.getElementById('connStatus').textContent = data.data.connStatus;
+                document.getElementById('connIP').textContent = data.data.connIP;
+                alert(data.message);
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
         async function fetchConnStatus() {
             try {
                 const data = await fetchGet('/conn_status');
@@ -122,7 +134,7 @@
                     document.getElementById('camFeed').src = url;
                 }
             } catch (error) {
-                document.getElementById('camIp').textContent = 'Error';
+                document.getElementById('camIp').textContent = '';
                 document.getElementById('camFeed').src = '';
             }
         }
@@ -138,6 +150,7 @@
 
         function eventListeners() {
             document.getElementById('connForm').addEventListener('submit', connect);
+            document.getElementById('disconnect').addEventListener('click', disconnect);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
