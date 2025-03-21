@@ -140,7 +140,7 @@ void connectSTA() {
 
     getSTAPassword();
 
-    WiFi.disconnect();
+    WiFi.disconnect(true);
     if (connect(staSSID.c_str(), staPassword.c_str())) Serial.printf("Connected to %s with IP %s\n", staSSID.c_str(), WiFi.localIP().toString().c_str());
     else Serial.printf("Failed to connect to %s\n", staSSID.c_str());
 }
