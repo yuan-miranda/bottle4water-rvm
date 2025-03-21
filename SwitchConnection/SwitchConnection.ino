@@ -144,11 +144,13 @@ void handleRoot() {
             let endTime;
             try {
                 const response = await fetch(url);
+                const responseText = await response.text();
                 let data;
+                
                 try {
-                    data = await response.json();
+                    data = JSON.parse(responseText);
                 } catch (error) {
-                    data = await response.text();
+                    data = responseText;
                 }
                 endTime = performance.now();
 
