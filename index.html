@@ -174,11 +174,13 @@
 
         async function updateStatus() {
             try {
-                await Promise.all([fetchConnStatus(), fetchCamStatus(), fetchCamSSIDPassword()]);
+                await fetchConnStatus();
+                await fetchCamStatus();
+                await fetchCamSSIDPassword();
             } catch (error) {
                 console.error('Error updating status:', error);
             }
-            setTimeout(updateStatus, 1000);
+            setTimeout(updateStatus, 5000);
         }
 
         function eventListeners() {

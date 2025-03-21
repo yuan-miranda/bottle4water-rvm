@@ -46,9 +46,17 @@ void setup() {
 
 void loop() {
     server.handleClient();
-    if (millis() - lastHeartbeat > 3000) {
+    if (millis() - lastHeartbeat > 3000 && camStatus == "Online") {
         lastHeartbeat = millis();
         checkCamTimeout();
+    }
+
+    if (WiFi.status() != WL_CONNECTED && connStatus == "Connected") {
+        Serial.printf("\nDisconnected from %s\n", staSSID.c_str());
+        staSSID = "";
+        staPASSWORD = "";
+        connStatus = "Not connected";
+        connIP = IPAddress();
     }
 }
 
@@ -75,17 +83,15 @@ bool pingCam() {
 
 bool connect(const char* ssid, const char* password) {
     WiFi.begin(ssid, password);
+    WiFi.setSleep(false);
 
     unsigned long startTime = millis();
     while (millis() - startTime < 8000) {
-        if (WiFi.status() == WL_CONNECTED) {
-            return true;
-        }
+        if (WiFi.status() == WL_CONNECTED) return true;
         delay(500);
     }
 
     WiFi.disconnect(true);
-    delay(1000);
     return false;
 }
 
@@ -267,11 +273,13 @@ void handleRoot() {
 
         async function updateStatus() {
             try {
-                await Promise.all([fetchConnStatus(), fetchCamStatus(), fetchCamSSIDPassword()]);
+                await fetchConnStatus();
+                await fetchCamStatus();
+                await fetchCamSSIDPassword();
             } catch (error) {
                 console.error('Error updating status:', error);
             }
-            setTimeout(updateStatus, 1000);
+            setTimeout(updateStatus, 5000);
         }
 
         function eventListeners() {
@@ -322,40 +330,39 @@ String getStatus500(String message) {
 }
 
 void handleConn() {
+    if (!server.hasArg("ssid")) {
+        server.send(400, "application/json", getStatus400("SSID is required"));
+        return;
+    }
+
+    staSSID = server.arg("ssid");
+    staPASSWORD = server.arg("password");
+
+    Serial.printf("\nConnecting to %s with password %s\n", staSSID.c_str(), staPASSWORD.c_str());
+
     String response;
-    if (server.hasArg("ssid")) {
-        staSSID = server.arg("ssid");
-        staPASSWORD = server.arg("password");
+    if (connect(staSSID.c_str(), staPASSWORD.c_str())) {
+        connStatus = "Connected";
+        connIP = WiFi.localIP();
+        Serial.printf("Connected to %s with IP %s\n", staSSID.c_str(), connIP.toString().c_str());
 
-        Serial.printf("\nConnecting to %s with password %s\n", staSSID.c_str(), staPASSWORD.c_str());
-        
-        if (connect(staSSID.c_str(), staPASSWORD.c_str())) {
-            connStatus = "Connected";
-            connIP = WiFi.localIP();
-            Serial.printf("Connected to %s with IP %s\n", staSSID.c_str(), connIP.toString().c_str());
+        String data = R"rawliteral(
+            "connStatus": ")rawliteral" + connStatus + R"rawliteral(",
+            "connIP": ")rawliteral" + connIP.toString() + R"rawliteral(",
+            "connSSID": ")rawliteral" + WiFi.SSID() + R"rawliteral(",
+            "connPassword": ")rawliteral" + WiFi.psk() + R"rawliteral("
+        )rawliteral";
 
-            String data = R"rawliteral(
-                "connStatus": ")rawliteral" + connStatus + R"rawliteral(",
-                "connIP": ")rawliteral" + connIP.toString() + R"rawliteral(",
-                "connSSID": ")rawliteral" + WiFi.SSID() + R"rawliteral(",
-                "connPassword": ")rawliteral" + WiFi.psk() + R"rawliteral("
-            )rawliteral";
-
-            response = getStatus200("Connected to network", data);
-            server.send(200, "application/json", response);
-        } else {
-            response = getStatus500("Failed to connect to network");
-            server.send(500, "application/json", response);
-        }
+        response = getStatus200("Connected to network", data);
+        server.send(200, "application/json", response);
     } else {
-        response = getStatus400("Missing SSID");
-        server.send(400, "application/json", response);
+        response = getStatus500("Failed to connect to network");
+        server.send(500, "application/json", response);
     }
 }
 
 void handleDisconnect() {
     WiFi.disconnect(true);
-    delay(1000);
     Serial.printf("\nDisconnected from %s\n", staSSID.c_str());
 
     staSSID = WiFi.SSID();
@@ -387,18 +394,6 @@ void handleIP() {
 }
 
 void handleConnStatus() {
-    if (WiFi.status() == WL_CONNECTED) {
-        staSSID = WiFi.SSID();
-        staPASSWORD = WiFi.psk();
-        connStatus = "Connected";
-        connIP = WiFi.localIP();
-    } else {
-        staSSID = "";
-        staPASSWORD = "";
-        connStatus = "Not connected";
-        connIP = IPAddress();
-    }
-
     String data = R"rawliteral(
         "connStatus": ")rawliteral" + connStatus + R"rawliteral(",
         "connIP": ")rawliteral" + connIP.toString() + R"rawliteral(",

@@ -81,16 +81,8 @@ void setup() {
     setupLedFlash(LED_GPIO_NUM);
 #endif
 
-    WiFi.begin(AP_SSID, AP_PASSWORD);
-    WiFi.setSleep(false);
-
-    int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 16) {
-        delay(500);
-        attempts++;
-    }
-
-    if (WiFi.status() != WL_CONNECTED) {
+    if (connect(AP_SSID, AP_PASSWORD)) Serial.printf("Connected to %s with IP %s\n", AP_SSID, WiFi.localIP().toString().c_str());
+    else {
         Serial.printf("Failed to connect to %s\n", AP_SSID);
         return;
     }
@@ -106,52 +98,45 @@ void loop() {
         staPassword = "";
         staIP = IPAddress();
 
-        WiFi.disconnect();
-        delay(1000);
-        WiFi.begin(AP_SSID, AP_PASSWORD);
-
-        int attempts = 0;
-        while (WiFi.status() != WL_CONNECTED && attempts < 16) {
-            delay(500);
-            attempts++;
-        }
-
-        if (WiFi.status() == WL_CONNECTED) Serial.printf("Reconnected to %s with IP %s\n", AP_SSID, WiFi.localIP().toString().c_str());
+        if (connect(AP_SSID, AP_PASSWORD)) Serial.printf("Reconnected to %s with IP %s\n", AP_SSID, WiFi.localIP().toString().c_str());
         else Serial.printf("Failed to reconnect to %s\n", AP_SSID);
     }
     if (WiFi.status() == WL_CONNECTED) connectSTA();
 
     sendStatus();
     sendIp();
-    delay(1000);
+}
+
+bool connect(const char* ssid, const char* password) {
+    WiFi.begin(ssid, password);
+    WiFi.setSleep(false);
+
+    unsigned long startTime = millis();
+    while (millis() - startTime < 8000) {
+        if (WiFi.status() == WL_CONNECTED) {
+            return true;
+        }
+        delay(500);
+    }
+
+    WiFi.disconnect(true);
+    return false;
 }
 
 void connectSTA() {
     getSTAIP();
     getSTASSID();
-    if (staSSID == "" || staSSID == WiFi.SSID()) {
-        Serial.printf("No STA SSID found\n");
-        return;
-    }
+    if (staSSID.length() == 0 || staSSID == WiFi.SSID()) return;
 
     getSTAPassword();
 
     WiFi.disconnect();
-    delay(1000);
-    WiFi.begin(staSSID.c_str(), staPassword.c_str());
-    WiFi.setSleep(false);
-
-    int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 10) {
-        delay(500);
-        attempts++;
-    }
-
-    if (WiFi.status() == WL_CONNECTED) Serial.printf("Connected to %s with IP %s\n", staSSID.c_str(), staIP.toString().c_str());
+    if (connect(staSSID.c_str(), staPassword.c_str())) Serial.printf("Connected to %s with IP %s\n", staSSID.c_str(), WiFi.localIP().toString().c_str());
     else Serial.printf("Failed to connect to %s\n", staSSID.c_str());
 }
 
 void getSTASSID() {
+    if (WiFi.status() != WL_CONNECTED) return;
     HTTPClient http;
 
     if (WiFi.SSID() == AP_SSID) http.begin(String(AP_LOCAL_IP) + "/ssid");
@@ -165,6 +150,7 @@ void getSTASSID() {
 }
 
 void getSTAPassword() {
+    if (WiFi.status() != WL_CONNECTED) return;
     HTTPClient http;
 
     if (WiFi.SSID() == AP_SSID) http.begin(String(AP_LOCAL_IP) + "/password");
@@ -178,13 +164,13 @@ void getSTAPassword() {
 }
 
 void getSTAIP() {
+    if (WiFi.status() != WL_CONNECTED) return;
     HTTPClient http;
     http.begin(String(AP_LOCAL_IP) + "/ip");
     http.addHeader("Content-Type", "text/plain");
 
     int httpResponseCode = http.GET();
     if (httpResponseCode == 200) staIP.fromString(http.getString());
-    Serial.println(staIP.toString());
     http.end();
 }
 
@@ -192,12 +178,8 @@ void sendStatus() {
     if (WiFi.status() == WL_CONNECTED) {
         HTTPClient http;
 
-        if (WiFi.SSID() == AP_SSID) {
-            http.begin(String(AP_LOCAL_IP) + "/cam_status");
-        }
-        else {
-            http.begin("http://" + staIP.toString() + "/cam_status");
-        }
+        if (WiFi.SSID() == AP_SSID) http.begin(String(AP_LOCAL_IP) + "/cam_status");
+        else http.begin("http://" + staIP.toString() + "/cam_status");
 
         http.addHeader("Content-Type", "application/x-www-form-urlencoded");
         
@@ -210,12 +192,8 @@ void sendIp() {
     if (WiFi.status() == WL_CONNECTED) {
         HTTPClient http;
 
-        if (WiFi.SSID() == AP_SSID) {
-            http.begin(String(AP_LOCAL_IP) + "/cam_ip");
-        }
-        else {
-            http.begin("http://" + staIP.toString() + "/cam_ip");
-        }
+        if (WiFi.SSID() == AP_SSID) http.begin(String(AP_LOCAL_IP) + "/cam_ip");
+        else http.begin("http://" + staIP.toString() + "/cam_ip");
         
         http.addHeader("Content-Type", "application/x-www-form-urlencoded");
         
