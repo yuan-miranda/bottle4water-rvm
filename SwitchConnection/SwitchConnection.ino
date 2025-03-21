@@ -384,15 +384,15 @@ void handleDisconnect() {
 }
 
 void handleSSID() {
-    server.send(200, "text/plain", WiFi.SSID());
+    server.send(200, "text/plain", staSSID);
 }
 
 void handlePassword() {
-    server.send(200, "text/plain", WiFi.psk());
+    server.send(200, "text/plain", staPASSWORD);
 }
 
 void handleIP() {
-    server.send(200, "text/plain", WiFi.localIP().toString());
+    server.send(200, "text/plain", connIP.toString());
 }
 
 void handleConnStatus() {
