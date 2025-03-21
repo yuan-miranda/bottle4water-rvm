@@ -32,14 +32,14 @@ void setup() {
     server.on("/ssid", HTTP_GET, handleSSID);
     server.on("/password", HTTP_GET, handlePassword);
     server.on("/ip", HTTP_GET, handleIP);
-    server.on("/conn_status", HTTP_GET, handleConnStatus);
-    server.on("/cam_status", HTTP_POST, handleCamStatus);
-    server.on("/cam_status", HTTP_GET, handleCamStatus);
-    server.on("/cam_ip", HTTP_POST, handleCamIP);
-    server.on("/cam_ip", HTTP_GET, handleCamIP);
+    server.on("/conn/status", HTTP_GET, handleConnStatus);
+    server.on("/cam/status", HTTP_POST, handleCamStatus);
+    server.on("/cam/status", HTTP_GET, handleCamStatus);
+    server.on("/cam/ip", HTTP_POST, handleCamIP);
+    server.on("/cam/ip", HTTP_GET, handleCamIP);
 
     // pin route controls
-    // server.on("");
+    server.on("/opengate", HTTP_POST, handleOpenGate);
 
     server.begin();
 }
@@ -222,7 +222,7 @@ void handleRoot() {
 
         async function fetchConnStatus() {
             try {
-                const data = await fetchGet('/conn_status');
+                const data = await fetchGet('/conn/status');
                 document.getElementById('connSSID').textContent = data.data.connSSID;
                 document.getElementById('connPassword').textContent = data.data.connPassword;
                 document.getElementById('connStatus').textContent = data.data.connStatus;
@@ -237,14 +237,14 @@ void handleRoot() {
 
         async function fetchCamStatus() {
             try {
-                const data = await fetchGet('/cam_status');
+                const data = await fetchGet('/cam/status');
                 document.getElementById('camStatus').textContent = data.data.camStatus;
             } catch (error) {
                 document.getElementById('camStatus').textContent = 'Offline';
             }
 
             try {
-                const data = await fetchGet('/cam_ip');
+                const data = await fetchGet('/cam/ip');
                 const url = `http://${data.data.camIP}/`;
                 const camFeedSrc = document.getElementById('camFeed').src;
                 if (camFeedSrc !== url) {
@@ -427,4 +427,26 @@ void handleCamIP() {
 
     String response = getStatus200("Camera IP", data);
     server.send(200, "application/json", response);
+}
+
+// the esp32 board will receive the request from the client and open the gate,
+// once the gate is open, it has 2 seconds to close it. Now, this is not stackable
+// i.e its not allowed to open the gate again while it is still open (this is handled
+// by a boolean variable that doesn't allow the gate to be opened while it is open).
+
+// Same goes for the valve, boolean variable, a 3 seconds delay to close and is stackable
+// i.e it only closes when the valve timer is up (adds 3 seconds to the current time for
+// each bottle sent to the client).
+
+// now the order of operation here is that;
+// 1. check if theres bottle in the gate (client side dont do anything here)
+// 2. client sends a request to open the gate (POST /opengate=true)
+// 3. esp32 receives the request and either
+//    a. open the servo motor if it is closed and close it after 2 seconds
+//    b. ignore the request if the gate is open
+// 4. after receiving the request, in open scenario, a function adds 3 seconds to the
+//    current time of the valve.
+
+
+void handleOpenGate() {
 }

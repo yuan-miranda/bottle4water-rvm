@@ -188,8 +188,8 @@ void sendStatus() {
     if (WiFi.status() == WL_CONNECTED) {
         HTTPClient http;
 
-        if (WiFi.SSID() == AP_SSID) http.begin(String(AP_LOCAL_IP) + "/cam_status");
-        else http.begin("http://" + staIP.toString() + "/cam_status");
+        if (WiFi.SSID() == AP_SSID) http.begin(String(AP_LOCAL_IP) + "/cam/status");
+        else http.begin("http://" + staIP.toString() + "/cam/status");
 
         http.addHeader("Content-Type", "application/x-www-form-urlencoded");
         
@@ -202,8 +202,8 @@ void sendIp() {
     if (WiFi.status() == WL_CONNECTED) {
         HTTPClient http;
 
-        if (WiFi.SSID() == AP_SSID) http.begin(String(AP_LOCAL_IP) + "/cam_ip");
-        else http.begin("http://" + staIP.toString() + "/cam_ip");
+        if (WiFi.SSID() == AP_SSID) http.begin(String(AP_LOCAL_IP) + "/cam/ip");
+        else http.begin("http://" + staIP.toString() + "/cam/ip");
         
         http.addHeader("Content-Type", "application/x-www-form-urlencoded");
         

@@ -123,7 +123,7 @@
 
         async function fetchConnStatus() {
             try {
-                const data = await fetchGet('/conn_status');
+                const data = await fetchGet('/conn/status');
                 document.getElementById('connSSID').textContent = data.data.connSSID;
                 document.getElementById('connPassword').textContent = data.data.connPassword;
                 document.getElementById('connStatus').textContent = data.data.connStatus;
@@ -138,14 +138,14 @@
 
         async function fetchCamStatus() {
             try {
-                const data = await fetchGet('/cam_status');
+                const data = await fetchGet('/cam/status');
                 document.getElementById('camStatus').textContent = data.data.camStatus;
             } catch (error) {
                 document.getElementById('camStatus').textContent = 'Offline';
             }
 
             try {
-                const data = await fetchGet('/cam_ip');
+                const data = await fetchGet('/cam/ip');
                 const url = `http://${data.data.camIP}/`;
                 const camFeedSrc = document.getElementById('camFeed').src;
                 if (camFeedSrc !== url) {
