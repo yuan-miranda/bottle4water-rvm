@@ -4,6 +4,7 @@ import os
 import requests
 import cv2
 import numpy as np
+import time
 
 ESP32_BOARD_IP = "192.168.16.75"
 ESP32_CAMERA_IP = "192.168.16.218"
@@ -35,3 +36,6 @@ while True:
     except Exception as e:
         print("Error:", e)
         continue
+
+
+    time.sleep(2)
