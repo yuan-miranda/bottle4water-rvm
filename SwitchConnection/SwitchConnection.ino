@@ -19,12 +19,27 @@ IPAddress camIP = IPAddress();
 unsigned long lastHeartbeat = 0;
 int failedCamConnAttempts = 0;
 
+bool isGateOpen = false;
+bool isValveOpen = false;
+
+unsigned long gateCloseTimer = 0;
+unsigned long valveCloseTimer = 0;
+
+const int gatePin;
+const int valvePin;
+
 WebServer server(80);
 
 void setup() {
     Serial.begin(115200);
     WiFi.mode(WIFI_AP_STA);
     WiFi.softAP(AP_SSID, AP_PASSWORD);
+
+    pinMode(gatePin, OUTPUT);
+    pinMode(valvePin, OUTPUT);
+
+    digitalWrite(gatePin, LOW);
+    digitalWrite(valvePin, LOW);
 
     server.on("/", HTTP_GET, handleRoot);
     server.on("/connect", HTTP_POST, handleConn);
@@ -58,6 +73,23 @@ void loop() {
         connStatus = "Not connected";
         connIP = IPAddress();
     }
+
+    checkGate();
+    checkValve();
+}
+
+void checkGate() {
+    if (isGateOpen && millis() >= gateCloseTimer) {
+        digitalWrite(gatePin, LOW);
+        isGateOpen = false;
+    }
+}
+
+void checkValve() {
+    if (isValveOpen && millis() >= valveCloseTimer) {
+        digitalWrite(valvePin, LOW);
+        isValveOpen = false;
+    }
 }
 
 void checkCamTimeout() {
@@ -74,6 +106,7 @@ void checkCamTimeout() {
 }
 
 bool pingCam() {
+    if (camIP == IPAddress()) return false;
     HTTPClient http;
     http.begin("http://" + camIP.toString() + "/");
     int httpCode = http.GET();
@@ -449,4 +482,17 @@ void handleCamIP() {
 
 
 void handleOpenGate() {
+    if (isGateOpen) {
+        server.send(403, "application/json", getStatus400("Gate is already open"));
+        return;
+    }
+
+    isGateOpen = true;
+    digitalWrite(gatePin, HIGH);
+    gateCloseTimer = millis() + 2000;
+
+    isValveOpen = true;
+    valveCloseTimer = max(millis(), valveCloseTimer) + 3000;
+
+    server.send(200, "application/json", getStatus200("Gate opened", ""));
 }
