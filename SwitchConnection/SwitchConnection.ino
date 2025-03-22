@@ -1,6 +1,10 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <HTTPClient.h>
+#include <ESP32Servo.h>
+
+#define SERVO_PIN_1 26
+#define SERVO_PIN_2 27
 
 // Default IP: http://192.168.4.1/
 
@@ -25,21 +29,20 @@ bool isValveOpen = false;
 unsigned long gateCloseTimer = 0;
 unsigned long valveCloseTimer = 0;
 
-const int gatePin;
-const int valvePin;
-
 WebServer server(80);
+
+// gate servo motor
+Servo servoMotor1;
+// valve servo motor
+Servo servoMotor2;
 
 void setup() {
     Serial.begin(115200);
     WiFi.mode(WIFI_AP_STA);
     WiFi.softAP(AP_SSID, AP_PASSWORD);
 
-    pinMode(gatePin, OUTPUT);
-    pinMode(valvePin, OUTPUT);
-
-    digitalWrite(gatePin, LOW);
-    digitalWrite(valvePin, LOW);
+    servoMotor1.attach(SERVO_PIN_1);
+    servoMotor2.attach(SERVO_PIN_2);
 
     server.on("/", HTTP_GET, handleRoot);
     server.on("/connect", HTTP_POST, handleConn);
@@ -80,14 +83,14 @@ void loop() {
 
 void checkGate() {
     if (isGateOpen && millis() >= gateCloseTimer) {
-        digitalWrite(gatePin, LOW);
+        servoMotor1.write(0);
         isGateOpen = false;
     }
 }
 
 void checkValve() {
     if (isValveOpen && millis() >= valveCloseTimer) {
-        digitalWrite(valvePin, LOW);
+        servoMotor2.write(0);
         isValveOpen = false;
     }
 }
@@ -462,25 +465,6 @@ void handleCamIP() {
     server.send(200, "application/json", response);
 }
 
-// the esp32 board will receive the request from the client and open the gate,
-// once the gate is open, it has 2 seconds to close it. Now, this is not stackable
-// i.e its not allowed to open the gate again while it is still open (this is handled
-// by a boolean variable that doesn't allow the gate to be opened while it is open).
-
-// Same goes for the valve, boolean variable, a 3 seconds delay to close and is stackable
-// i.e it only closes when the valve timer is up (adds 3 seconds to the current time for
-// each bottle sent to the client).
-
-// now the order of operation here is that;
-// 1. check if theres bottle in the gate (client side dont do anything here)
-// 2. client sends a request to open the gate (POST /opengate=true)
-// 3. esp32 receives the request and either
-//    a. open the servo motor if it is closed and close it after 2 seconds
-//    b. ignore the request if the gate is open
-// 4. after receiving the request, in open scenario, a function adds 3 seconds to the
-//    current time of the valve.
-
-
 void handleOpenGate() {
     if (isGateOpen) {
         server.send(403, "application/json", getStatus400("Gate is already open"));
@@ -488,7 +472,7 @@ void handleOpenGate() {
     }
 
     isGateOpen = true;
-    digitalWrite(gatePin, HIGH);
+    servoMotor1.write(90);
     gateCloseTimer = millis() + 2000;
 
     isValveOpen = true;

@@ -5,8 +5,8 @@ import requests
 import cv2
 import numpy as np
 
-ESP32_BOARD_IP = "192.168.1.13"
-ESP32_CAMERA_IP = "192.168.1.13"
+ESP32_BOARD_IP = "192.168.16.75"
+ESP32_CAMERA_IP = "192.168.16.218"
 
 BOARD_URL = f"http://{ESP32_BOARD_IP}/opengate"
 CAMERA_URL = f"http://{ESP32_CAMERA_IP}/capture"
