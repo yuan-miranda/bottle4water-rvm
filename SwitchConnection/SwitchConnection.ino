@@ -473,10 +473,13 @@ void handleOpenGate() {
 
     isGateOpen = true;
     servoMotor1.write(90);
+    
+    delay(100);
+    servoMotor2.write(90);
     gateCloseTimer = millis() + 2000;
 
     isValveOpen = true;
-    valveCloseTimer = max(millis(), valveCloseTimer) + 3000;
+    valveCloseTimer = max(millis(), valveCloseTimer) + 10000;
 
     server.send(200, "application/json", getStatus200("Gate opened", ""));
 }
